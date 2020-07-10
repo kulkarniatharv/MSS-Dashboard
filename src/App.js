@@ -12,7 +12,14 @@ function App() {
     <div>
       <NavigationBar brand="MSS" link="#home" />
       {/* <BookingForm /> */}
-      <RoomDetailsNew />
+      <RoomDetailsNew
+        hotelid="rutu"
+        bookingCode={`MSS${new Date()
+          .toLocaleString('en-IE')
+          .replace(/\//g, '')
+          .replace(/,\s*/g, '')
+          .replace(/:/g, '')}`}
+      />
     </div>
   );
 }

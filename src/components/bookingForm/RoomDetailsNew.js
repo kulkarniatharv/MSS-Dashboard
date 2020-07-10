@@ -9,7 +9,7 @@ import Col from 'react-bootstrap/Col';
 import Container from 'react-bootstrap/Container';
 import * as Yup from 'yup';
 import Axios from 'axios';
-// import PropTypes from 'prop-types';
+import PropTypes from 'prop-types';
 
 // JSON Format
 // submission = {
@@ -19,13 +19,13 @@ import Axios from 'axios';
 // };
 
 // TODO:
-//  1.
+//  *. Calculate taxes on the amount
 
 // FIXME:
-//  1. Error message not in red color.
+//
 
 // =================== EVENT HANDLERS ====================
-const addRoomHandler = (array, NumOfRooms, filteredRateCal) => {
+const addRoomHandler = (array, NumOfRooms, filteredRateCal, bookingCode) => {
   const newLength = NumOfRooms - array.length;
   if (newLength < 0) {
     for (let i = newLength; i < 0; i += 1) {
@@ -34,9 +34,9 @@ const addRoomHandler = (array, NumOfRooms, filteredRateCal) => {
   } else if (newLength > 0) {
     for (let i = 0; i < newLength; i += 1) {
       array.push({
-        BookingCode: '',
-        RoomTypeCode: '',
-        MasterRoom: '',
+        BookingCode: bookingCode,
+        RoomTypeCode: Object.keys(filteredRateCal)[0],
+        MasterRoom: Object.keys(filteredRateCal)[0],
         SchemeName: 'S1',
         RatePlan: '',
         RoomType: Object.keys(filteredRateCal)[0],
@@ -47,8 +47,8 @@ const addRoomHandler = (array, NumOfRooms, filteredRateCal) => {
         child: '',
         Expax: '',
         Amount: '',
-        ExpaxAmt: '',
-        ChildAmt: '',
+        ExpaxAmt: '0',
+        ChildAmt: '0',
         AllAmtInClude: '',
         GuestCheckInNo: '',
         NumRooms: 1,
@@ -57,12 +57,101 @@ const addRoomHandler = (array, NumOfRooms, filteredRateCal) => {
   }
 };
 
+const updateTotalAdultsChildren = (
+  adult,
+  setFieldValue,
+  fieldName,
+  FormValues,
+  eventValue,
+  currIndex
+) => {
+  setFieldValue(
+    fieldName,
+    FormValues.bookingRooms
+      .map((obj, objIndex) => {
+        if (objIndex === currIndex) {
+          return Number(eventValue);
+        }
+        if (!adult) {
+          return Number(obj.child);
+        }
+        return Number(obj.Pax);
+      })
+      .reduce((total, peoplePerRoom) => total + peoplePerRoom)
+  );
+};
+
+const updateTotalAmt = (
+  setFieldValue,
+  FormValues,
+  NumNights,
+  roomAmt,
+  currIndex
+) => {
+  setFieldValue(
+    'bookingDetailV8.BilledAmount',
+    Number(
+      Number(NumNights) *
+        FormValues.bookingRooms
+          .map((room, index) => {
+            if (index === currIndex) {
+              return roomAmt;
+            }
+            return Number(room.Amount);
+          })
+          .reduce((total, AmountPerRoom) => total + AmountPerRoom)
+    )
+  );
+};
+
+const calcRoomAmt = (
+  filteredRateCal,
+  setFieldValue,
+  fieldName,
+  FormValues,
+  eventValue,
+  currIndex,
+  isChildren
+) => {
+  const roomDetail =
+    filteredRateCal[FormValues.bookingRooms[currIndex].RoomType][
+      FormValues.bookingRooms[currIndex].MealPlan
+    ][FormValues.bookingRooms[currIndex].RatePlan][0];
+
+  let roomAmt = null;
+
+  // Calculating the Room specific amount
+  if (!isChildren) {
+    roomAmt =
+      Number(roomDetail.RRate) +
+      Number(eventValue) * roomDetail.ExpaxRate +
+      Number(FormValues.bookingRooms[currIndex].ChildAmt);
+  } else {
+    roomAmt =
+      Number(roomDetail.RRate) +
+      Number(FormValues.bookingRooms[currIndex].ExpaxAmt) +
+      Number(eventValue) * roomDetail.ChildRate;
+  }
+
+  setFieldValue(fieldName, roomAmt);
+
+  // Calculating the total amount
+  updateTotalAmt(
+    setFieldValue,
+    FormValues,
+    FormValues.bookingDetailV8.NumNights,
+    roomAmt,
+    currIndex
+  );
+};
+
 // ======================VALIDATION SCHEMA===================================
 const validationSchema = Yup.object({
   clsHotelID: Yup.object({
     HotelId: Yup.string().required('No hotel id provided.'),
   }),
   bookingDetailV8: Yup.object({
+    BookingCode: Yup.string().required(),
     Checkin: Yup.date()
       .required('Required')
       .min(new Date().toJSON().slice(0, 10), 'Invalid Checkin Date'),
@@ -111,375 +200,50 @@ const validationSchema = Yup.object({
       ExpaxAmt: Yup.string()
         .matches(/^[0-9]*$/, 'Invalid number')
         .required('Extra person amt is required!'),
+      ChildAmt: Yup.string()
+        .matches(/^[0-9]*$/, 'Invalid number')
+        .required('Children amt is required!'),
+      Amount: Yup.string()
+        .matches(/^[0-9]*$/, 'Invalid number')
+        .required('Amount is required!'),
     })
   ),
 });
 
 // ===================RENDER COMPONENT===================================
 const RoomDetailsNew = props => {
+  const { hotelid, bookingCode } = props;
+
+  // STATE VARIABLES
   const [rateCal, setRateCal] = useState([]);
   const [isDisabled, setIsDisabled] = useState(false);
-
-  const temp = [
-    {
-      CalenderDate: '2020/Apr/10',
-      RoomTypeCode: 'A2001',
-      RoomType: 'DLX',
-      RatePlan: 'DLXCP',
-      RRate: 4500.0,
-      MealPlan: 'CP',
-      Pax: 2,
-      ExpaxRate: 1000.0,
-      ChildRate: 500.0,
-      MaxPax: 2,
-      ChildAgeFrom: 5,
-      AdultAgeFrom: 11,
-    },
-    {
-      CalenderDate: '2020/Apr/10',
-      RoomTypeCode: 'A2001',
-      RoomType: 'DLX',
-      RatePlan: 'DLXCP1',
-      RRate: 4500.0,
-      MealPlan: 'AP',
-      Pax: 2,
-      ExpaxRate: 1000.0,
-      ChildRate: 500.0,
-      MaxPax: 2,
-      ChildAgeFrom: 5,
-      AdultAgeFrom: 11,
-    },
-    {
-      CalenderDate: '2020/Apr/10',
-      RoomTypeCode: 'A2001',
-      RoomType: 'EXE',
-      RatePlan: 'EXECP',
-      RRate: 3500.0,
-      MealPlan: 'CP',
-      Pax: 2,
-      ExpaxRate: 900.0,
-      ChildRate: 400.0,
-      MaxPax: 2,
-      ChildAgeFrom: 5,
-      AdultAgeFrom: 11,
-    },
-    {
-      CalenderDate: '2020/Apr/10',
-      RoomTypeCode: 'A2001',
-      RoomType: 'EXE',
-      RatePlan: 'EXECP1',
-      RRate: 3500.0,
-      MealPlan: 'AP',
-      Pax: 2,
-      ExpaxRate: 900.0,
-      ChildRate: 400.0,
-      MaxPax: 2,
-      ChildAgeFrom: 5,
-      AdultAgeFrom: 11,
-    },
-    {
-      CalenderDate: '2020/Apr/10',
-      RoomTypeCode: 'A2001',
-      RoomType: 'EXE',
-      RatePlan: 'EXECP2',
-      RRate: 3500.0,
-      MealPlan: 'AP2',
-      Pax: 2,
-      ExpaxRate: 900.0,
-      ChildRate: 400.0,
-      MaxPax: 2,
-      ChildAgeFrom: 5,
-      AdultAgeFrom: 11,
-    },
-    {
-      CalenderDate: '2020/Apr/11',
-      RoomTypeCode: 'A2001',
-      RoomType: 'DLX',
-      RatePlan: 'DLXCP',
-      RRate: 4500.0,
-      MealPlan: 'CP',
-      Pax: 2,
-      ExpaxRate: 1000.0,
-      ChildRate: 500.0,
-      MaxPax: 2,
-      ChildAgeFrom: 5,
-      AdultAgeFrom: 11,
-    },
-    {
-      CalenderDate: '2020/Apr/11',
-      RoomTypeCode: 'A2001',
-      RoomType: 'EXE',
-      RatePlan: 'EXECP',
-      RRate: 3500.0,
-      MealPlan: 'CP',
-      Pax: 2,
-      ExpaxRate: 900.0,
-      ChildRate: 400.0,
-      MaxPax: 2,
-      ChildAgeFrom: 5,
-      AdultAgeFrom: 11,
-    },
-    {
-      CalenderDate: '2020/Apr/12',
-      RoomTypeCode: 'A2001',
-      RoomType: 'DLX',
-      RatePlan: 'DLXCP',
-      RRate: 4500.0,
-      MealPlan: 'CP',
-      Pax: 2,
-      ExpaxRate: 1000.0,
-      ChildRate: 500.0,
-      MaxPax: 2,
-      ChildAgeFrom: 5,
-      AdultAgeFrom: 11,
-    },
-    {
-      CalenderDate: '2020/Apr/12',
-      RoomTypeCode: 'A2001',
-      RoomType: 'EXE',
-      RatePlan: 'EXECP',
-      RRate: 3500.0,
-      MealPlan: 'CP',
-      Pax: 2,
-      ExpaxRate: 900.0,
-      ChildRate: 400.0,
-      MaxPax: 2,
-      ChildAgeFrom: 5,
-      AdultAgeFrom: 11,
-    },
-    {
-      CalenderDate: '2020/Apr/13',
-      RoomTypeCode: 'A2001',
-      RoomType: 'DLX',
-      RatePlan: 'DLXCP',
-      RRate: 4500.0,
-      MealPlan: 'CP',
-      Pax: 2,
-      ExpaxRate: 1000.0,
-      ChildRate: 500.0,
-      MaxPax: 2,
-      ChildAgeFrom: 5,
-      AdultAgeFrom: 11,
-    },
-    {
-      CalenderDate: '2020/Apr/13',
-      RoomTypeCode: 'A2001',
-      RoomType: 'EXE',
-      RatePlan: 'EXECP',
-      RRate: 3500.0,
-      MealPlan: 'CP',
-      Pax: 2,
-      ExpaxRate: 900.0,
-      ChildRate: 400.0,
-      MaxPax: 2,
-      ChildAgeFrom: 5,
-      AdultAgeFrom: 11,
-    },
-    {
-      CalenderDate: '2020/Apr/14',
-      RoomTypeCode: 'A2001',
-      RoomType: 'DLX',
-      RatePlan: 'DLXCP',
-      RRate: 4500.0,
-      MealPlan: 'CP',
-      Pax: 2,
-      ExpaxRate: 1000.0,
-      ChildRate: 500.0,
-      MaxPax: 2,
-      ChildAgeFrom: 5,
-      AdultAgeFrom: 11,
-    },
-    {
-      CalenderDate: '2020/Apr/14',
-      RoomTypeCode: 'A2001',
-      RoomType: 'EXE',
-      RatePlan: 'EXECP',
-      RRate: 3500.0,
-      MealPlan: 'CP',
-      Pax: 2,
-      ExpaxRate: 900.0,
-      ChildRate: 400.0,
-      MaxPax: 2,
-      ChildAgeFrom: 5,
-      AdultAgeFrom: 11,
-    },
-    {
-      CalenderDate: '2020/Apr/15',
-      RoomTypeCode: 'A2001',
-      RoomType: 'DLX',
-      RatePlan: 'DLXCP',
-      RRate: 4500.0,
-      MealPlan: 'CP',
-      Pax: 2,
-      ExpaxRate: 1000.0,
-      ChildRate: 500.0,
-      MaxPax: 2,
-      ChildAgeFrom: 5,
-      AdultAgeFrom: 11,
-    },
-    {
-      CalenderDate: '2020/Apr/15',
-      RoomTypeCode: 'A2001',
-      RoomType: 'EXE',
-      RatePlan: 'EXECP',
-      RRate: 3500.0,
-      MealPlan: 'CP',
-      Pax: 2,
-      ExpaxRate: 900.0,
-      ChildRate: 400.0,
-      MaxPax: 2,
-      ChildAgeFrom: 5,
-      AdultAgeFrom: 11,
-    },
-    {
-      CalenderDate: '2020/Apr/16',
-      RoomTypeCode: 'A2001',
-      RoomType: 'DLX',
-      RatePlan: 'DLXCP',
-      RRate: 4500.0,
-      MealPlan: 'CP',
-      Pax: 2,
-      ExpaxRate: 1000.0,
-      ChildRate: 500.0,
-      MaxPax: 2,
-      ChildAgeFrom: 5,
-      AdultAgeFrom: 11,
-    },
-    {
-      CalenderDate: '2020/Apr/16',
-      RoomTypeCode: 'A2001',
-      RoomType: 'EXE',
-      RatePlan: 'EXECP',
-      RRate: 3500.0,
-      MealPlan: 'CP',
-      Pax: 2,
-      ExpaxRate: 900.0,
-      ChildRate: 400.0,
-      MaxPax: 2,
-      ChildAgeFrom: 5,
-      AdultAgeFrom: 11,
-    },
-    {
-      CalenderDate: '2020/Apr/17',
-      RoomTypeCode: 'A2001',
-      RoomType: 'DLX',
-      RatePlan: 'DLXCP',
-      RRate: 4500.0,
-      MealPlan: 'CP',
-      Pax: 2,
-      ExpaxRate: 1000.0,
-      ChildRate: 500.0,
-      MaxPax: 2,
-      ChildAgeFrom: 5,
-      AdultAgeFrom: 11,
-    },
-    {
-      CalenderDate: '2020/Apr/17',
-      RoomTypeCode: 'A2001',
-      RoomType: 'EXE',
-      RatePlan: 'EXECP',
-      RRate: 3500.0,
-      MealPlan: 'CP',
-      Pax: 2,
-      ExpaxRate: 900.0,
-      ChildRate: 400.0,
-      MaxPax: 2,
-      ChildAgeFrom: 5,
-      AdultAgeFrom: 11,
-    },
-    {
-      CalenderDate: '2020/Apr/18',
-      RoomTypeCode: 'A2001',
-      RoomType: 'DLX',
-      RatePlan: 'DLXCP',
-      RRate: 4500.0,
-      MealPlan: 'CP',
-      Pax: 2,
-      ExpaxRate: 1000.0,
-      ChildRate: 500.0,
-      MaxPax: 2,
-      ChildAgeFrom: 5,
-      AdultAgeFrom: 11,
-    },
-    {
-      CalenderDate: '2020/Apr/18',
-      RoomTypeCode: 'A2001',
-      RoomType: 'EXE',
-      RatePlan: 'EXECP',
-      RRate: 3500.0,
-      MealPlan: 'CP',
-      Pax: 2,
-      ExpaxRate: 900.0,
-      ChildRate: 400.0,
-      MaxPax: 2,
-      ChildAgeFrom: 5,
-      AdultAgeFrom: 11,
-    },
-    {
-      CalenderDate: '2020/Apr/19',
-      RoomTypeCode: 'A2001',
-      RoomType: 'DLX',
-      RatePlan: 'DLXCP',
-      RRate: 4500.0,
-      MealPlan: 'CP',
-      Pax: 2,
-      ExpaxRate: 1000.0,
-      ChildRate: 500.0,
-      MaxPax: 2,
-      ChildAgeFrom: 5,
-      AdultAgeFrom: 11,
-    },
-    {
-      CalenderDate: '2020/Apr/19',
-      RoomTypeCode: 'A2001',
-      RoomType: 'EXE',
-      RatePlan: 'EXECP',
-      RRate: 3500.0,
-      MealPlan: 'CP',
-      Pax: 2,
-      ExpaxRate: 900.0,
-      ChildRate: 400.0,
-      MaxPax: 2,
-      ChildAgeFrom: 5,
-      AdultAgeFrom: 11,
-    },
-    {
-      CalenderDate: '2020/Apr/20',
-      RoomTypeCode: 'A2001',
-      RoomType: 'DLX',
-      RatePlan: 'DLXCP',
-      RRate: 4500.0,
-      MealPlan: 'CP',
-      Pax: 2,
-      ExpaxRate: 1000.0,
-      ChildRate: 500.0,
-      MaxPax: 2,
-      ChildAgeFrom: 5,
-      AdultAgeFrom: 11,
-    },
-    {
-      CalenderDate: '2020/Apr/20',
-      RoomTypeCode: 'A2001',
-      RoomType: 'EXE',
-      RatePlan: 'EXECP',
-      RRate: 3500.0,
-      MealPlan: 'CP',
-      Pax: 2,
-      ExpaxRate: 900.0,
-      ChildRate: 400.0,
-      MaxPax: 2,
-      ChildAgeFrom: 5,
-      AdultAgeFrom: 11,
-    },
-  ];
+  const [checkinDate, setCheckinDate] = useState(
+    new Date()
+      .toLocaleDateString('en-IE')
+      .replace(
+        /\/.*\//,
+        `/${new Date().toLocaleDateString('default', { month: 'short' })}/`
+      )
+  );
+  const [checkoutDate, setCheckoutDate] = useState(
+    new Date(new Date().setDate(new Date().getDate() + 7))
+      .toLocaleDateString('en-IE')
+      .replace(
+        /\/.*\//,
+        `/${new Date().toLocaleDateString('default', { month: 'short' })}/`
+      )
+  );
 
   const filteredRateCal = {};
 
+  // Method to send POST request to /GetRateCalender
   const GetRateCalender = () => {
+    console.log('CI: ', checkinDate, 'CO: ', checkoutDate);
+
     Axios.post('http://hms.multitechsoftsystem.co.in/api/GetRateCalender', {
-      HotelID: { HotelId: 'rutu' },
-      FromDate: '2020/Apr/15',
-      ToDate: '2020/Apr/20',
+      HotelID: { HotelId: hotelid },
+      FromDate: checkinDate,
+      ToDate: checkoutDate,
     }).then(
       response => {
         setRateCal(response.data);
@@ -491,11 +255,11 @@ const RoomDetailsNew = props => {
     );
   };
 
-  // useEffect(GetRateCalender, []);
+  useEffect(GetRateCalender, [checkinDate, checkoutDate]);
 
   // filtering the receiced Rate Calender JSON Object
-  if (temp) {
-    for (const item of temp) {
+  if (rateCal) {
+    for (const item of rateCal) {
       // Push the item following the data structure
       // {
       //   RoomType : {
@@ -523,6 +287,8 @@ const RoomDetailsNew = props => {
       ) {
         filteredRateCal[item.RoomType][item.MealPlan][item.RatePlan] = [];
         filteredRateCal[item.RoomType][item.MealPlan][item.RatePlan].push(item);
+      } else {
+        filteredRateCal[item.RoomType][item.MealPlan][item.RatePlan].push(item);
       }
     }
 
@@ -536,34 +302,47 @@ const RoomDetailsNew = props => {
           <Formik
             initialValues={{
               clsHotelID: {
-                HotelId: 'htlname',
+                HotelId: hotelid,
               },
               bookingDetailV8: {
-                // ChannelId: 100,
-                // ChannelName: 'CHANNELONE',
-                // BookingCode: '',
+                ChannelId: 100,
+                ChannelName: 'CHANNELONE',
+                BookingCode: bookingCode,
                 Checkin: new Date().toJSON().slice(0, 10),
                 Checkout: new Date(new Date().setDate(new Date().getDate() + 1))
                   .toJSON()
                   .slice(0, 10),
-                NumNights: '',
+                NumNights: '1',
                 NumRooms: '1',
                 BookingStatus: 'CONF',
                 DateBooked: new Date().toJSON().slice(0, 10),
                 CustomerName: '',
                 CustomerEmail: '',
                 CustomerMobile: '',
-                TotalAdults: '1',
+                TotalAdults: '0',
                 TotalChildren: '0',
-                BilledAmount: 0.0,
-                // PaymentType: 'ONLINE',
-                // BookingDetailUrl: '', // null
+                BilledAmount:
+                  filteredRateCal[Object.keys(filteredRateCal)[0]][
+                    Object.keys(
+                      filteredRateCal[Object.keys(filteredRateCal)[0]]
+                    )[0]
+                  ][
+                    Object.keys(
+                      filteredRateCal[Object.keys(filteredRateCal)[0]][
+                        Object.keys(
+                          filteredRateCal[Object.keys(filteredRateCal)[0]]
+                        )[0]
+                      ]
+                    )[0]
+                  ][0].RRate,
+                PaymentType: 'ONLINE',
+                BookingDetailUrl: '', // null
               },
               bookingRooms: [
                 {
-                  // BookingCode: '',
-                  RoomTypeCode: '',
-                  MasterRoom: '', // SAME AS RoomType
+                  BookingCode: bookingCode,
+                  RoomTypeCode: Object.keys(filteredRateCal)[0],
+                  MasterRoom: Object.keys(filteredRateCal)[0], // SAME AS RoomType
                   SchemeName: 'S1', // fixed
                   RatePlan: Object.keys(
                     filteredRateCal[Object.keys(filteredRateCal)[0]][
@@ -581,7 +360,20 @@ const RoomDetailsNew = props => {
                   Pax: '', // Number of people. Check if they are less than or equal to maxPax, and update Expax field for any extra person
                   child: '0', // No of children (>8yr)
                   Expax: '0', // extra person
-                  Amount: '', // Same as RRate
+                  Amount:
+                    filteredRateCal[Object.keys(filteredRateCal)[0]][
+                      Object.keys(
+                        filteredRateCal[Object.keys(filteredRateCal)[0]]
+                      )[0]
+                    ][
+                      Object.keys(
+                        filteredRateCal[Object.keys(filteredRateCal)[0]][
+                          Object.keys(
+                            filteredRateCal[Object.keys(filteredRateCal)[0]]
+                          )[0]
+                        ]
+                      )[0]
+                    ][0].RRate, // Same as RRate
                   ExpaxAmt: '0', // included in GET request. Expax * Rate received for single expax from req
                   ChildAmt: '0', // included in GET request. child * Rate received for single child from req
                   AllAmtInClude: '', // "Y" or "N" Dropdown
@@ -625,6 +417,9 @@ const RoomDetailsNew = props => {
                                 as={Form.Control}
                                 onChange={e => {
                                   handleChange(e);
+
+                                  const date = new Date(e.target.value);
+
                                   setFieldValue(
                                     'bookingDetailV8.NumNights',
                                     `${
@@ -632,12 +427,29 @@ const RoomDetailsNew = props => {
                                         ? (new Date(
                                             values.bookingDetailV8.Checkout
                                           ) -
-                                            new Date(e.target.value)) /
+                                            date) /
                                           (1000 * 3600 * 24)
                                         : 0
                                     }`
                                   );
-                                  console.log('Checkin Changed');
+
+                                  if (
+                                    new Date(checkinDate) !==
+                                    new Date(e.target.value)
+                                  ) {
+                                    let updatedDate = new Date(e.target.value);
+
+                                    updatedDate = `${updatedDate.getDate()}/${updatedDate.toLocaleString(
+                                      'default',
+                                      {
+                                        month: 'short',
+                                      }
+                                    )}/${updatedDate.getFullYear()}`;
+
+                                    console.log('Updated Date: ', updatedDate);
+
+                                    setCheckinDate(updatedDate);
+                                  }
                                 }}
                                 className={
                                   getIn(errors, 'bookingDetailsV8.Checkin') &&
@@ -676,7 +488,24 @@ const RoomDetailsNew = props => {
                                         : 0
                                     }`
                                   );
-                                  console.log('Checkout Changed');
+
+                                  if (
+                                    new Date(checkoutDate) !==
+                                    new Date(e.target.value)
+                                  ) {
+                                    let updatedDate = new Date(e.target.value);
+
+                                    updatedDate = `${updatedDate.getDate()}/${updatedDate.toLocaleString(
+                                      'default',
+                                      {
+                                        month: 'short',
+                                      }
+                                    )}/${updatedDate.getFullYear()}`;
+
+                                    console.log('Updated Date: ', updatedDate);
+
+                                    setCheckoutDate(updatedDate);
+                                  }
                                 }}
                                 className={
                                   getIn(errors, 'bookingDetailsV8.Checkout')
@@ -692,8 +521,43 @@ const RoomDetailsNew = props => {
                               />
                             </Col>
                           </Form.Group>
+
+                          {/* Booking Code */}
+                          <Form.Group
+                            as={Col}
+                            controlId="booking_code"
+                            md="auto"
+                          >
+                            <Form.Label column>Booking Code</Form.Label>
+                            <Col>
+                              <Field
+                                name="bookingDetailV8.BookingCode"
+                                as={Form.Control}
+                                value={values.bookingDetailV8.BookingCode}
+                                onChange={e => {
+                                  handleChange(e);
+                                }}
+                                className={
+                                  getIn(
+                                    errors,
+                                    'bookingDetailsV8.BookingCode'
+                                  ) &&
+                                  getIn(touched, 'bookingDetailsV8.BookingCode')
+                                    ? 'error'
+                                    : null
+                                }
+                              />
+                              <ErrorMessage
+                                component="div"
+                                name="bookingDetailV8.BookingCode"
+                                className="input-feedback"
+                              />
+                            </Col>
+                          </Form.Group>
                         </Form.Row>
+
                         <hr />
+
                         <Form.Row>
                           {/* Customer Name */}
                           <Form.Group
@@ -808,78 +672,6 @@ const RoomDetailsNew = props => {
                             </Col>
                           </Form.Group>
 
-                          {/* Total Adults */}
-                          <Form.Group
-                            as={Col}
-                            controlId="total_adults"
-                            md="auto"
-                          >
-                            <Form.Label column>Total Adults</Form.Label>
-                            <Col>
-                              <Field
-                                name="bookingDetailV8.TotalAdults"
-                                as={Form.Control}
-                                value={values.bookingDetailV8.TotalAdults}
-                                type="email"
-                                onChange={e => {
-                                  handleChange(e);
-                                  console.log('TotalAdults Changed');
-                                }}
-                                className={
-                                  getIn(
-                                    errors,
-                                    'bookingDetailsV8.TotalAdults'
-                                  ) &&
-                                  getIn(touched, 'bookingDetailsV8.TotalAdults')
-                                    ? 'error'
-                                    : null
-                                }
-                              />
-                              <ErrorMessage
-                                component="div"
-                                name="bookingDetailV8.TotalAdults"
-                                className="input-feedback"
-                              />
-                            </Col>
-                          </Form.Group>
-
-                          {/* Total Children */}
-                          <Form.Group
-                            as={Col}
-                            controlId="total_children"
-                            md="auto"
-                          >
-                            <Form.Label column>Total Children</Form.Label>
-                            <Col>
-                              <Field
-                                name="bookingDetailV8.TotalChildren"
-                                as={Form.Control}
-                                value={values.bookingDetailV8.TotalChildren}
-                                onChange={e => {
-                                  handleChange(e);
-                                  console.log('TotalChildren Changed');
-                                }}
-                                className={
-                                  getIn(
-                                    errors,
-                                    'bookingDetailsV8.TotalChildren'
-                                  ) &&
-                                  getIn(
-                                    touched,
-                                    'bookingDetailsV8.TotalChildren'
-                                  )
-                                    ? 'error'
-                                    : null
-                                }
-                              />
-                              <ErrorMessage
-                                component="div"
-                                name="bookingDetailV8.TotalChildren"
-                                className="input-feedback"
-                              />
-                            </Col>
-                          </Form.Group>
-
                           {/* Number of nights */}
                           <Form.Group as={Col} controlId="numnights" md="auto">
                             <Form.Label column>Number of nights</Form.Label>
@@ -890,10 +682,13 @@ const RoomDetailsNew = props => {
                                 value={values.bookingDetailV8.NumNights}
                                 onChange={e => {
                                   handleChange(e);
+
                                   const today = new Date(
                                     values.bookingDetailV8.Checkin
                                   );
+
                                   const { value } = e.target;
+
                                   if (/^[0-9]*$/.test(value)) {
                                     setFieldValue(
                                       'bookingDetailV8.Checkout',
@@ -910,7 +705,13 @@ const RoomDetailsNew = props => {
                                       }`
                                     );
                                   }
-                                  console.log('NumNights Changed');
+
+                                  // Updating the total amount
+                                  updateTotalAmt(
+                                    setFieldValue,
+                                    values,
+                                    e.target.value
+                                  );
                                 }}
                                 className={
                                   getIn(errors, 'bookingDetailsV8.NumNights')
@@ -943,8 +744,10 @@ const RoomDetailsNew = props => {
                                   addRoomHandler(
                                     values.bookingRooms,
                                     Number(e.target.value),
-                                    filteredRateCal
+                                    filteredRateCal,
+                                    bookingCode
                                   );
+                                  setIsDisabled(true);
                                 }}
                                 className={
                                   getIn(errors, 'bookingDetailsV8.NumRooms') &&
@@ -967,9 +770,17 @@ const RoomDetailsNew = props => {
                         <FieldArray
                           name="bookingRooms"
                           render={arrayHelpers => (
-                            <Container>
+                            <>
+                              {isDisabled ? (
+                                <div style={{ color: 'red' }}>
+                                  Room Type, Meal Plan and Rate Plan of all the
+                                  rooms should be selected to edit the disabled
+                                  fields
+                                </div>
+                              ) : null}
+
                               {values.bookingRooms.map((room, index) => (
-                                <div key={Math.floor(Math.random() * 10000)}>
+                                <div key={index}>
                                   <h3 style={{ textAlign: 'center' }}>
                                     Room {index + 1}
                                   </h3>
@@ -1014,6 +825,29 @@ const RoomDetailsNew = props => {
                                               ]
                                             ) {
                                               setIsDisabled(false);
+                                              setFieldValue(
+                                                `bookingRooms.${index}.Amount`,
+                                                filteredRateCal[e.target.value][
+                                                  getIn(
+                                                    values,
+                                                    `bookingRooms.${index}.MealPlan`
+                                                  )
+                                                ][
+                                                  getIn(
+                                                    values,
+                                                    `bookingRooms.${index}.RatePlan`
+                                                  )
+                                                ][0].RRate
+                                              );
+
+                                              setFieldValue(
+                                                'MasterRoom',
+                                                e.target.value
+                                              );
+                                              setFieldValue(
+                                                'RoomTypeCode',
+                                                e.target.value
+                                              );
                                             } else {
                                               setIsDisabled(true);
                                             }
@@ -1093,6 +927,20 @@ const RoomDetailsNew = props => {
                                               ]
                                             ) {
                                               setIsDisabled(false);
+                                              setFieldValue(
+                                                `bookingRooms.${index}.Amount`,
+                                                filteredRateCal[
+                                                  getIn(
+                                                    values,
+                                                    `bookingRooms.${index}.RoomType`
+                                                  )
+                                                ][e.target.value][
+                                                  getIn(
+                                                    values,
+                                                    `bookingRooms.${index}.RatePlan`
+                                                  )
+                                                ][0].RRate
+                                              );
                                             } else {
                                               setIsDisabled(true);
                                             }
@@ -1183,6 +1031,22 @@ const RoomDetailsNew = props => {
                                               ][e.target.value]
                                             ) {
                                               setIsDisabled(false);
+
+                                              // Setting the amount of room to given RRate in the RateCalender
+                                              setFieldValue(
+                                                `bookingRooms.${index}.Amount`,
+                                                filteredRateCal[
+                                                  getIn(
+                                                    values,
+                                                    `bookingRooms.${index}.RoomType`
+                                                  )
+                                                ][
+                                                  getIn(
+                                                    values,
+                                                    `bookingRooms.${index}.MealPlan`
+                                                  )
+                                                ][e.target.value][0].RRate
+                                              );
                                             } else {
                                               setIsDisabled(true);
                                             }
@@ -1244,7 +1108,9 @@ const RoomDetailsNew = props => {
                                         className="input-feedback"
                                       />
                                     </Form.Group>
+                                  </Form.Row>
 
+                                  <Form.Row>
                                     {/* NUMBER OF PERSONS or TOTAL ADULTS */}
                                     <Form.Group
                                       as={Col}
@@ -1252,15 +1118,45 @@ const RoomDetailsNew = props => {
                                       md="auto"
                                     >
                                       <Form.Label column>
-                                        Total Adults
+                                        Adults
+                                        {!isDisabled
+                                          ? ` (more than ${
+                                              filteredRateCal[
+                                                getIn(
+                                                  values,
+                                                  `bookingRooms.${index}.RoomType`
+                                                )
+                                              ][
+                                                getIn(
+                                                  values,
+                                                  `bookingRooms.${index}.MealPlan`
+                                                )
+                                              ][
+                                                getIn(
+                                                  values,
+                                                  `bookingRooms.${index}.RatePlan`
+                                                )
+                                              ][0].MaxPax
+                                            } will be considered in extra persons)`
+                                          : null}
                                       </Form.Label>
                                       <Col>
                                         <Field
                                           disabled={isDisabled}
                                           name={`bookingRooms.${index}.Pax`}
+                                          placeholder="Including extra persons"
                                           as={Form.Control}
                                           onChange={e => {
                                             handleChange(e);
+
+                                            updateTotalAdultsChildren(
+                                              true,
+                                              setFieldValue,
+                                              'bookingDetailV8.TotalAdults',
+                                              values,
+                                              e.target.value,
+                                              index
+                                            );
 
                                             const maxPax =
                                               filteredRateCal[
@@ -1291,7 +1187,7 @@ const RoomDetailsNew = props => {
                                               );
 
                                               // Setting up Extra person amount
-                                              const ExPaxAmt =
+                                              const ExPaxAmt = Number(
                                                 filteredRateCal[
                                                   getIn(
                                                     values,
@@ -1307,13 +1203,33 @@ const RoomDetailsNew = props => {
                                                     values,
                                                     `bookingRooms.${index}.RatePlan`
                                                   )
-                                                ][0].ExpaxRate;
+                                                ][0].ExpaxRate
+                                              );
 
                                               setFieldValue(
                                                 `bookingRooms.${index}.ExpaxAmt`,
                                                 `${extraPerson * ExPaxAmt}`
                                               );
+                                            } else {
+                                              setFieldValue(
+                                                `bookingRooms.${index}.Expax`,
+                                                ``
+                                              );
+                                              setFieldValue(
+                                                `bookingRooms.${index}.ExpaxAmt`,
+                                                ``
+                                              );
                                             }
+
+                                            // Setting Amount field
+                                            calcRoomAmt(
+                                              filteredRateCal,
+                                              setFieldValue,
+                                              `bookingRooms.${index}.Amount`,
+                                              values,
+                                              extraPerson,
+                                              index
+                                            );
                                           }}
                                           className={
                                             getIn(
@@ -1336,7 +1252,9 @@ const RoomDetailsNew = props => {
                                         />
                                       </Col>
                                     </Form.Group>
+                                  </Form.Row>
 
+                                  <Form.Row>
                                     {/* Expax */}
                                     <Form.Group
                                       as={Col}
@@ -1354,7 +1272,7 @@ const RoomDetailsNew = props => {
                                           onChange={e => {
                                             handleChange(e);
 
-                                            const ExPaxAmt =
+                                            const roomDetail =
                                               filteredRateCal[
                                                 getIn(
                                                   values,
@@ -1370,11 +1288,45 @@ const RoomDetailsNew = props => {
                                                   values,
                                                   `bookingRooms.${index}.RatePlan`
                                                 )
-                                              ][0].ExpaxRate;
+                                              ][0];
 
+                                            const ExPaxAmt =
+                                              roomDetail.ExpaxRate;
+
+                                            // Setting the Extra persons amount field
                                             setFieldValue(
                                               `bookingRooms.${index}.ExpaxAmt`,
                                               `${e.target.value * ExPaxAmt}`
+                                            );
+
+                                            // Updating the amount of the rooms
+                                            calcRoomAmt(
+                                              filteredRateCal,
+                                              setFieldValue,
+                                              `bookingRooms.${index}.Amount`,
+                                              values,
+                                              e.target.value,
+                                              index
+                                            );
+
+                                            // Updating the Pax field
+                                            const newTotalAdults =
+                                              Number(e.target.value) +
+                                              Number(roomDetail.MaxPax);
+
+                                            setFieldValue(
+                                              `bookingRooms.${index}.Pax`,
+                                              newTotalAdults
+                                            );
+
+                                            // Updating the total adults in bookingDetailV8
+                                            updateTotalAdultsChildren(
+                                              true,
+                                              setFieldValue,
+                                              'bookingDetailV8.TotalAdults',
+                                              values,
+                                              newTotalAdults,
+                                              index
                                             );
                                           }}
                                           className={
@@ -1410,6 +1362,7 @@ const RoomDetailsNew = props => {
                                       </Form.Label>
                                       <Col>
                                         <Field
+                                          disabled
                                           name={`bookingRooms.${index}.ExpaxAmt`}
                                           as={Form.Control}
                                           onChange={e => {
@@ -1443,9 +1396,7 @@ const RoomDetailsNew = props => {
                                       controlId="num_pax"
                                       md="auto"
                                     >
-                                      <Form.Label column>
-                                        Total Children
-                                      </Form.Label>
+                                      <Form.Label column>Children</Form.Label>
                                       <Col>
                                         <Field
                                           disabled={isDisabled}
@@ -1453,6 +1404,15 @@ const RoomDetailsNew = props => {
                                           as={Form.Control}
                                           onChange={e => {
                                             handleChange(e);
+
+                                            updateTotalAdultsChildren(
+                                              false,
+                                              setFieldValue,
+                                              'bookingDetailV8.TotalChildren',
+                                              values,
+                                              e.target.value,
+                                              index
+                                            );
 
                                             // Setting up Child amount
                                             const ChildAmt =
@@ -1477,6 +1437,16 @@ const RoomDetailsNew = props => {
                                               `bookingRooms.${index}.ChildAmt`,
                                               `${e.target.value * ChildAmt}`
                                             );
+
+                                            calcRoomAmt(
+                                              filteredRateCal,
+                                              setFieldValue,
+                                              `bookingRooms.${index}.Amount`,
+                                              values,
+                                              e.target.value,
+                                              index,
+                                              true
+                                            );
                                           }}
                                           className={
                                             getIn(
@@ -1499,12 +1469,210 @@ const RoomDetailsNew = props => {
                                         />
                                       </Col>
                                     </Form.Group>
+
+                                    {/* Children amount */}
+                                    <Form.Group
+                                      as={Col}
+                                      controlId="child_amt"
+                                      md="auto"
+                                    >
+                                      <Form.Label column>
+                                        Children Amount
+                                      </Form.Label>
+                                      <Col>
+                                        <Field
+                                          disabled
+                                          name={`bookingRooms.${index}.ChildAmt`}
+                                          as={Form.Control}
+                                          onChange={e => {
+                                            handleChange(e);
+                                          }}
+                                          className={
+                                            getIn(
+                                              errors,
+                                              `bookingRooms.${index}.ChildAmt`
+                                            ) &&
+                                            getIn(
+                                              touched,
+                                              `bookingRooms.${index}.ChildAmt`
+                                            )
+                                              ? 'error'
+                                              : null
+                                          }
+                                        />
+
+                                        <ErrorMessage
+                                          component="div"
+                                          name={`bookingRooms.${index}.ChildAmt`}
+                                          className="input-feedback"
+                                        />
+                                      </Col>
+                                    </Form.Group>
+                                  </Form.Row>
+
+                                  <Form.Row>
+                                    {/* Amount/Night */}
+                                    <Form.Group
+                                      as={Col}
+                                      controlId="child_amt"
+                                      md="auto"
+                                    >
+                                      <Form.Label column>
+                                        Amount/Night
+                                      </Form.Label>
+                                      <Col>
+                                        <Field
+                                          disabled
+                                          name={`bookingRooms.${index}.Amount`}
+                                          as={Form.Control}
+                                          onChange={e => {
+                                            handleChange(e);
+                                          }}
+                                          className={
+                                            getIn(
+                                              errors,
+                                              `bookingRooms.${index}.Amount`
+                                            ) &&
+                                            getIn(
+                                              touched,
+                                              `bookingRooms.${index}.Amount`
+                                            )
+                                              ? 'error'
+                                              : null
+                                          }
+                                        />
+
+                                        <ErrorMessage
+                                          component="div"
+                                          name={`bookingRooms.${index}.Amount`}
+                                          className="input-feedback"
+                                        />
+                                      </Col>
+                                    </Form.Group>
                                   </Form.Row>
                                 </div>
                               ))}
-                            </Container>
+                            </>
                           )}
                         />
+
+                        <hr />
+
+                        <Container>
+                          <Form.Row>
+                            {/* Total Adults */}
+                            <Form.Group
+                              as={Col}
+                              controlId="total_adults"
+                              md="auto"
+                            >
+                              <Form.Label column>Total Adults</Form.Label>
+                              <Col>
+                                <Field
+                                  name="bookingDetailV8.TotalAdults"
+                                  as={Form.Control}
+                                  onChange={e => {
+                                    handleChange(e);
+                                  }}
+                                  className={
+                                    getIn(
+                                      errors,
+                                      'bookingDetailsV8.TotalAdults'
+                                    ) &&
+                                    getIn(
+                                      touched,
+                                      'bookingDetailsV8.TotalAdults'
+                                    )
+                                      ? 'error'
+                                      : null
+                                  }
+                                />
+                                <ErrorMessage
+                                  component="div"
+                                  name="bookingDetailV8.TotalAdults"
+                                  className="input-feedback"
+                                />
+                              </Col>
+                            </Form.Group>
+
+                            {/* Total Children */}
+                            <Form.Group
+                              as={Col}
+                              controlId="total_children"
+                              md="auto"
+                            >
+                              <Form.Label column>Total Children</Form.Label>
+                              <Col>
+                                <Field
+                                  name="bookingDetailV8.TotalChildren"
+                                  as={Form.Control}
+                                  value={values.bookingRooms
+                                    .map(room => Number(room.child))
+                                    .reduce(
+                                      (total, childrenPerRoom) =>
+                                        total + childrenPerRoom
+                                    )}
+                                  onChange={e => {
+                                    handleChange(e);
+                                  }}
+                                  className={
+                                    getIn(
+                                      errors,
+                                      'bookingDetailsV8.TotalChildren'
+                                    ) &&
+                                    getIn(
+                                      touched,
+                                      'bookingDetailsV8.TotalChildren'
+                                    )
+                                      ? 'error'
+                                      : null
+                                  }
+                                />
+                                <ErrorMessage
+                                  component="div"
+                                  name="bookingDetailV8.TotalChildren"
+                                  className="input-feedback"
+                                />
+                              </Col>
+                            </Form.Group>
+
+                            {/* Total Amount */}
+                            <Form.Group
+                              as={Col}
+                              controlId="total_children"
+                              md="auto"
+                            >
+                              <Form.Label column>Total Amount</Form.Label>
+                              <Col>
+                                <Field
+                                  disabled
+                                  name="bookingDetailV8.BilledAmount"
+                                  as={Form.Control}
+                                  onChange={e => {
+                                    handleChange(e);
+                                  }}
+                                  className={
+                                    getIn(
+                                      errors,
+                                      'bookingDetailsV8.BilledAmount'
+                                    ) &&
+                                    getIn(
+                                      touched,
+                                      'bookingDetailsV8.BilledAmount'
+                                    )
+                                      ? 'error'
+                                      : null
+                                  }
+                                />
+                                <ErrorMessage
+                                  component="div"
+                                  name="bookingDetailV8.BilledAmount"
+                                  className="input-feedback"
+                                />
+                              </Col>
+                            </Form.Group>
+                          </Form.Row>
+                        </Container>
                       </div>
                     </Container>
 
@@ -1542,14 +1710,15 @@ const RoomDetailsNew = props => {
           </Formik>
         </div>
       ) : (
-        <div>Loading...</div>
+        <>LOADING...</>
       )}
     </div>
   );
 };
 
-// RoomDetailsNew.propTypes = {
-//   rateCalender: PropTypes.object.isRequired,
-// };
+RoomDetailsNew.propTypes = {
+  hotelid: PropTypes.string.isRequired,
+  bookingCode: PropTypes.string.isRequired,
+};
 
 export default RoomDetailsNew;
