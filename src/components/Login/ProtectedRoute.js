@@ -1,24 +1,37 @@
 /* eslint-disable react/prop-types */
 import React from 'react';
 import { Route, Redirect } from 'react-router-dom';
-import auth from './auth';
+import Dashboard from '../Dashboard/Dashboard';
 
-const ProtectedRoute = ({ component: Component, componentProps, ...rest }) => (
-  <Route
-    {...rest}
-    render={props => {
-      if (auth.isAuthenticated()) {
-        return <Component {...props} {...componentProps} />;
-      }
-      return (
-        <Redirect
-          to={{
-            pathname: '/login',
-          }}
-        />
-      );
-    }}
-  />
-);
+const ProtectedRoute = ({ component, isAuthorized, getJWT, ...rest }) => {
+  console.log('isAuthorized protected route', isAuthorized());
+  return (
+    <Route
+      {...rest}
+      render={props => {
+        if (isAuthorized()) {
+          return (
+            <Dashboard
+              compo={component}
+              getJWT={() => getJWT(isAuthorized())}
+              {...props}
+              {...rest}
+            />
+          );
+        }
+        return (
+          <Redirect
+            to={{
+              pathname: '/login',
+              state: {
+                referrer: props.location.pathname,
+              },
+            }}
+          />
+        );
+      }}
+    />
+  );
+};
 
 export default ProtectedRoute;

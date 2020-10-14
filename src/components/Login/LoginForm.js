@@ -7,15 +7,14 @@ import Form from 'react-bootstrap/Form';
 import Button from 'react-bootstrap/Button';
 import Col from 'react-bootstrap/Col';
 import Container from 'react-bootstrap/Container';
-import NavigationBar from '../NavigationBar/NavigationBar';
-import auth from './auth';
+import axios from 'axios';
 
 // TODO:
 // * http://hms.multitechsoftsystem.co.in/token POST-Data: username=kulkarniprashantk@gmail.com&password=Atharv-5779&grant_type=password
 // Use Auth class to send the post request
 
 // FIXME:
-//
+// Every protected route renders login screen. Which shouldn't be the case once authenticated.
 
 const validationSchema = Yup.object({
   username: Yup.string()
@@ -27,8 +26,16 @@ const validationSchema = Yup.object({
   password: Yup.string().required('Required'),
 });
 
+// =============== RENDER COMPONENT =============
 const LoginForm = props => {
+  const { HandleAuthorization, location, history } = props;
+
   const [authErr, setAuthErr] = useState(0);
+
+  if (location.state !== undefined) {
+    console.log('Referrer: ', props.location.state.referrer);
+  }
+
   return (
     <div className="login">
       <div
@@ -46,17 +53,40 @@ const LoginForm = props => {
           onSubmit={(data, { setSubmitting }) => {
             setSubmitting(true);
 
-            auth.login(data).then(JWToken => {
-              if (JWToken) {
-                props.history.push({
-                  pathname: '/booking',
-                });
-              } else if (!JWToken) {
-                setAuthErr(1);
-              }
-            });
+            const reqBody = `username=${data.username}&password=${
+              data.password
+            }&grant_type=password`;
+            // 'username=kulkarniprashantk@gmail.com&password=Atharv-5779&grant_type=password';
 
-            setSubmitting(false);
+            axios
+              .post('http://hms.multitechsoftsystem.com/token', reqBody)
+              .then(res => {
+                // Set the token in local storage
+                localStorage.setItem('MSSToken', res.data.access_token);
+
+                // Set user authorized in the app component
+                HandleAuthorization();
+
+                setSubmitting(false);
+
+                // Redirect to location it came from. ProtectedRoute will redirect to login
+                if (location.state !== undefined) {
+                  // console.log('Referrer in req: ', location.state.referrer);
+
+                  history.push({
+                    pathname: location.state.referrer,
+                  });
+                } else {
+                  history.push({
+                    pathname: '/',
+                  });
+                }
+              })
+              .catch(err => {
+                console.log(err);
+                setAuthErr(1);
+                setSubmitting(false);
+              });
           }}
         >
           {({ handleSubmit, isSubmitting, errors }) => (

@@ -1,0 +1,24 @@
+.error {
+  border: 2px solid #FF6565;
+}
+
+.input-feedback {
+  color: red;
+}
+
+.booking-form input {
+  background-color: transparent !important;
+  box-shadow: 2px 4px #cfd8ff;
+}
+
+.booking-form input:disabled {
+  background-color: #3a679b !important;
+  box-shadow: none;
+  color: #fefefe;
+}
+
+.booking-form select {
+  background-color: transparent !important;
+  border: none;
+  box-shadow: 0px 0px 10px 2px #b1bffc;
+}
