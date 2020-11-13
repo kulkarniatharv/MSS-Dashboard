@@ -258,8 +258,6 @@ const RoomDetailsNew = props => {
     console.log('Sending GetRateCalender req from BookingForm');
     console.log('CI: ', checkinDate, 'CO: ', checkoutDate);
 
-    // console.log('Token', getJWT());
-
     Axios.post(
       'http://hms.multitechsoftsystem.com/api/GetRateCalender',
       {

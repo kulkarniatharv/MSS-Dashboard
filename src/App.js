@@ -6,11 +6,13 @@ import { BrowserRouter as Router, Switch, Route } from 'react-router-dom';
 import BookingForm from './components/BookingForm/BookingForm';
 import LoginForm from './components/Login/LoginForm';
 import ProtectedRoute from './components/Login/ProtectedRoute';
-import Welcome from './components/Welcome';
+import GuestStatus from './components/GuestStatus/GuestStatus';
+import Welcome from './components/Welcome/Welcome';
 
 // TODO:
 // * Every route will render dashboard which will take the respective component as the input and display the appropriate component in the content area
 // * Create a welcome page and add links in dashboard
+// * Create a loading screen
 
 function App() {
   const [isAuthorized, setIsAuthorized] = useState(false);
@@ -46,6 +48,15 @@ function App() {
               .replace(/\//g, '')
               .replace(/,\s*/g, '')
               .replace(/:/g, '')}`}
+          />
+
+          <ProtectedRoute
+            exact
+            path="/gueststatus"
+            component={GuestStatus}
+            isAuthorized={getAuthorizationStatus}
+            getJWT={getJWT}
+            hotelid="rutu"
           />
 
           <Route

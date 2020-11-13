@@ -56,7 +56,6 @@ div.side-navbar .menu div {
   padding: 0.75em;
   margin: 0 0.5em;
   /*margin top and bottom is 0 and right and left is 0.5*/
-  cursor: pointer;
   display: inline;
 }
 

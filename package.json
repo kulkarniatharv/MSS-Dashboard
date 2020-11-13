@@ -1,5 +1,6 @@
 {
-  "name": "booking_form",
+  "name": "mss-dashboard",
+  "homepage": "http://dashboard.multitechsoftsystem.com/",
   "version": "0.1.0",
   "private": true,
   "dependencies": {

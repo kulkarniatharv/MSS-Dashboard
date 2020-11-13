@@ -20,7 +20,7 @@ const Dashboard = props => {
 
       <div className="side-navbar">
         <div className="hotel-details">
-          <span>Hotel Blah blah asdd</span>
+          <span>Hotel Demo</span>
         </div>
 
         <div className="menu">
@@ -36,10 +36,36 @@ const Dashboard = props => {
               }}
               to="/booking"
             >
-              Booking
+              <span
+                style={{
+                  display: 'block',
+                }}
+              >
+                Booking
+              </span>
             </Link>
           </div>
-          <div>Room status</div>
+          <div
+            className={`${
+              rest.location.pathname.match(/gueststatus/i) ? 'active' : ''
+            }`}
+          >
+            <Link
+              style={{
+                textDecoration: 'none',
+                color: 'black',
+              }}
+              to="/gueststatus"
+            >
+              <span
+                style={{
+                  display: 'block',
+                }}
+              >
+                Guest Status
+              </span>
+            </Link>
+          </div>
         </div>
       </div>
 
