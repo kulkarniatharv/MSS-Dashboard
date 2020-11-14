@@ -10,8 +10,6 @@ const Welcome = () => (
       <h1>MSS Dashboard</h1>
     </div>
 
-    {/* <div className="welcome-logo">
-    </div> */}
     <WelcomeLogo id="biggerScreen" />
 
     <WelcomeLogoSmaller id="smallerScreen" />
