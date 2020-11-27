@@ -1,0 +1,148 @@
+.tableStatus-container {
+  display: flex;
+  flex-direction: column;
+  overflow: auto;
+  height: 100%;
+}
+
+.vouc-grp {
+  margin: 1em 2em;
+}
+
+.vouc-grp input {
+  margin: 0.5em 0 0;
+}
+
+.free-tables {
+  order: 2;
+  flex-grow: 1.5;
+  margin: 2em 1em 1em;
+}
+
+.free-tables > div {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(5em, 1fr));
+  grid-gap: 1em;
+  padding: 0em 1em;
+}
+
+.free-tables > div h2 {
+  padding: 0;
+  grid-column: 1 / -1;
+  text-align: center;
+  font-weight: bold;
+}
+
+.occupied-tables {
+  order: 3;
+  flex-grow: 3;
+  margin: 2em 2em 1em;
+}
+
+.occupied-tables > div {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  grid-template-rows: auto;
+  justify-content: center;
+  justify-items: center;
+  align-items: center;
+}
+
+.occupied-tables > div h2 {
+  grid-column: 1 / -1;
+  text-align: center;
+  padding: 0 0 1em;
+  font-weight: bold;
+}
+
+.occupied-tables > div > span {
+  text-align: center;
+  padding: 0 0.5em;
+}
+
+.occupied-tables > div div {
+  display: contents;
+}
+
+.occupied-tables > div div span{
+  text-align: center;
+  padding: 1em 0;
+  margin: 1em 0 0;
+  height: auto;
+  width: 100%;
+  background-color: #23272B;
+  color: white;
+} 
+
+.occupied-tables > div div span:nth-child(4n) {
+  border-radius: 0 40px 40px 0;
+}
+
+.occupied-tables > div div span:nth-child(4n+1) {
+  border-radius: 40px 0 0 40px;
+}
+
+@media only screen and (min-width: 768px){
+
+  .vouc-grp {
+    display: flex;
+    flex-wrap: wrap;
+    flex-direction: row;
+    justify-content: space-evenly;
+    padding: 2em 2em;
+  }
+
+  .vouc-grp input {
+    margin: 1em 0 0;
+  }
+
+  .occupied-tables {
+    overflow: auto;
+  }
+
+  .occupied-tables > div {
+    grid-template-columns: 1fr 2.5fr 2fr 2fr;
+    padding: 0 1em 0 0;
+  }
+
+}
+
+@media only screen and (min-width: 1200px){
+  .tableStatus-container {
+    display: flex;
+    flex-direction: row;
+    justify-items: center;
+    justify-content: center;
+  }
+  
+  .vouc-grp {
+    flex-direction: column;
+    justify-content: space-evenly;
+    width: auto;
+    padding: 0 2em;
+  }
+  
+  .occupied-tables{
+    order: 2;
+    max-width: 550px;
+    margin: 3em 1em 1em;
+  }
+
+  .free-tables {
+    max-width: 300px;
+    margin: 3em 1em 1em;
+    order: 3;
+  }
+  
+  .free-tables > div {
+    grid-template-columns: repeat(3, 1fr);
+    grid-template-rows: auto;
+    padding: 0 1em 0 0;
+  }
+
+  .free-tables > div h2 {
+    padding: 0 0 1em;
+  }
+
+
+}

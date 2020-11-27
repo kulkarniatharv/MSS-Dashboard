@@ -1,0 +1,21 @@
+.guest-status-card {
+  padding: 1em;
+  background-color: #23272B;
+  color: white;
+  display: grid;
+  grid-template-columns: 1fr 2fr 1fr 2fr;
+  height: 100%;
+  align-items: center;
+}
+
+.guest-status-card span {
+  padding: 0 0 0.5em;
+}
+
+.guest-status-card span:nth-child(2n) {
+  text-align: center;
+}
+
+.guest-status-card span:nth-child(2n-1) {
+  text-align: right;
+}

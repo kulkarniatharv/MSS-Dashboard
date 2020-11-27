@@ -1,15 +1,26 @@
-import React, { useState } from 'react';
+import React, { useState, Suspense } from 'react';
 import './App.css';
 import 'bootstrap/dist/css/bootstrap.min.css';
 import 'animate.css';
 import { BrowserRouter as Router, Switch, Route } from 'react-router-dom';
-import BookingForm from './components/BookingForm/BookingForm';
-import LoginForm from './components/Login/LoginForm';
-import ProtectedRoute from './components/Login/ProtectedRoute';
-import GuestStatus from './components/GuestStatus/GuestStatus';
-import Welcome from './components/Welcome/Welcome';
+
+const BookingForm = React.lazy(() =>
+  import('./components/BookingForm/BookingForm')
+);
+const LoginForm = React.lazy(() => import('./components/Login/LoginForm'));
+const ProtectedRoute = React.lazy(() =>
+  import('./components/Login/ProtectedRoute')
+);
+const GuestStatus = React.lazy(() =>
+  import('./components/GuestStatus/GuestStatus')
+);
+const Welcome = React.lazy(() => import('./components/Welcome/Welcome'));
+const TableStatus = React.lazy(() =>
+  import('./components/restaurant/TableStatus/TableStatus')
+);
 
 // TODO:
+// * Protected Route is disabled and redirect statement is removed, add it from zweeter's files
 // * Every route will render dashboard which will take the respective component as the input and display the appropriate component in the content area
 // * Create a welcome page and add links in dashboard
 // * Create a loading screen
@@ -34,49 +45,61 @@ function App() {
   return (
     <Router>
       <div className="App">
-        {/* <NavigationBar brand="MSS" link="#home" /> */}
-        <Switch>
-          <ProtectedRoute
-            exact
-            path="/booking"
-            component={BookingForm}
-            isAuthorized={getAuthorizationStatus}
-            getJWT={getJWT}
-            hotelid="rutu"
-            bookingCode={`MSS${new Date()
-              .toLocaleString('en-IE')
-              .replace(/\//g, '')
-              .replace(/,\s*/g, '')
-              .replace(/:/g, '')}`}
-          />
+        <Suspense fallback={<div>Loading...</div>}>
+          <Switch>
+            <ProtectedRoute
+              exact
+              path="/booking"
+              component={BookingForm}
+              isAuthorized={getAuthorizationStatus}
+              getJWT={getJWT}
+              hotelid="rutu"
+              bookingCode={`MSS${new Date()
+                .toLocaleString('en-IE')
+                .replace(/\//g, '')
+                .replace(/,\s*/g, '')
+                .replace(/:/g, '')}`}
+            />
 
-          <ProtectedRoute
-            exact
-            path="/gueststatus"
-            component={GuestStatus}
-            isAuthorized={getAuthorizationStatus}
-            getJWT={getJWT}
-            hotelid="rutu"
-          />
+            <ProtectedRoute
+              exact
+              path="/gueststatus"
+              component={GuestStatus}
+              isAuthorized={getAuthorizationStatus}
+              getJWT={getJWT}
+              hotelid="rutu"
+            />
 
-          <Route
-            exact
-            path="/login"
-            render={props => (
-              <LoginForm {...props} HandleAuthorization={HandleAuthorization} />
-            )}
-          />
+            <ProtectedRoute
+              exact
+              path="/tablestatus"
+              component={TableStatus}
+              isAuthorized={getAuthorizationStatus}
+              getJWT={getJWT}
+            />
 
-          <ProtectedRoute
-            exact
-            path="/"
-            component={Welcome}
-            isAuthorized={getAuthorizationStatus}
-            getJWT={getJWT}
-          />
+            <Route
+              exact
+              path="/login"
+              render={props => (
+                <LoginForm
+                  {...props}
+                  HandleAuthorization={HandleAuthorization}
+                />
+              )}
+            />
 
-          <Route path="*" component={() => '404 NOT FOUND'} />
-        </Switch>
+            <ProtectedRoute
+              exact
+              path="/"
+              component={Welcome}
+              isAuthorized={getAuthorizationStatus}
+              getJWT={getJWT}
+            />
+
+            <Route path="*" component={() => '404 NOT FOUND'} />
+          </Switch>
+        </Suspense>
       </div>
     </Router>
   );

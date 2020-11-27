@@ -66,6 +66,28 @@ const Dashboard = props => {
               </span>
             </Link>
           </div>
+
+          <div
+            className={`${
+              rest.location.pathname.match(/tablestatus/i) ? 'active' : ''
+            }`}
+          >
+            <Link
+              style={{
+                textDecoration: 'none',
+                color: 'black',
+              }}
+              to="/tablestatus"
+            >
+              <span
+                style={{
+                  display: 'block',
+                }}
+              >
+                Table Status
+              </span>
+            </Link>
+          </div>
         </div>
       </div>
 

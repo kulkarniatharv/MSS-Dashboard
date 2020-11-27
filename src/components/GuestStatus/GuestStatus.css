@@ -1,0 +1,13 @@
+.guest-status-list {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(20em, 1fr));
+  grid-gap: 1em;
+  margin: 1em;
+}
+
+.guest-status-list #changeViewBtn {
+  width: auto;
+  grid-column: 1/-1;
+  font-weight: bolder; 
+  border-radius: 20px;
+}

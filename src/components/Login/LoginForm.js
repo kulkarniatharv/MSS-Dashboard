@@ -12,9 +12,10 @@ import axios from 'axios';
 // TODO:
 // * http://hms.multitechsoftsystem.co.in/token POST-Data: username=kulkarniprashantk@gmail.com&password=Atharv-5779&grant_type=password
 // Use Auth class to send the post request
+// * While submitting the form, show a popup or msg that the credentials are being submitted.
 
 // FIXME:
-// Every protected route renders login screen. Which shouldn't be the case once authenticated.
+//
 
 const validationSchema = Yup.object({
   username: Yup.string()
